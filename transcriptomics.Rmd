@@ -1,0 +1,97 @@
+---
+title: "multi_omics"
+author: "Aishwarya Iyer"
+date: "7/11/2023"
+output: html_document
+---
+
+# Set up environment
+```{r}
+#clear workspace and set string as factors to false
+#rm(list=ls())
+options(stringsAsFactors = F)
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+#load libraries
+library(rstudioapi)
+library(readxl)
+library(dplyr)
+
+# set working environment to the location where current source file is saved into.
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+#Read metadata
+htxMeta <- read.csv("hmp2_metadata.csv")
+
+#filter out by data type as host-transcriptomics
+htxMeta <- htxMeta  %>% filter(htxMeta$data_type == "host_transcriptomics")
+```
+
+
+```{r}
+#filter out data by biopsy location, include CD, UC and nonIBD samples from ileum and rectum location 
+htxMeta <-htxMeta  %>% filter(  (htxMeta$diagnosis == "CD" & htxMeta$biopsy_location=="Ileum") 
+                              | (htxMeta$diagnosis == "CD" & htxMeta$biopsy_location=="Rectum")
+                              | (htxMeta$diagnosis == "UC" & htxMeta$biopsy_location=="Ileum") 
+                              | (htxMeta$diagnosis == "UC" & htxMeta$biopsy_location=="Rectum") 
+                              | (htxMeta$diagnosis == "nonIBD" & htxMeta$biopsy_location=="Rectum") 
+                              | (htxMeta$diagnosis == "nonIBD" & htxMeta$biopsy_location=="Ileum") 
+)
+```
+
+```{r}
+#filter out samples by visit_num=1
+htxMeta <-htxMeta  %>% filter(htxMeta$visit_num == "1")
+```
+
+```{r}
+#Order htxMeta data based on external ID to match samples with htx count correctly
+htxMeta<- htxMeta[order(htxMeta$External.ID),]#order htxMeta by external ID
+
+```
+
+
+```{r}
+#transcript count (htx count) original file is read
+htxOrj <- read.csv("host_tx_counts.tsv",sep = "\t")
+#Convert sample names to upper (some of them are in lower case)
+colnames(htxOrj)<-toupper(colnames(htxOrj))
+#htx count data is filtered based on column names in htxMeta
+names.use <- names(htxOrj)[(names(htxOrj) %in% htxMeta$External.ID)]
+#filter out htxOrj based on names.use and create a new htxCount
+htxCount <- htxOrj[, names.use]
+#htxCount data are ordered based on column names to match samples between htxCount and sampleLabels
+htxCount <- htxCount[,order(names(htxCount))]
+
+#sample distribution based on biopsy locations
+ileum =nrow(htxMeta[htxMeta$biopsy_location=="Ileum",])
+rectum = nrow(htxMeta[htxMeta$biopsy_location=="Rectum",])
+cat ("Number of samples in ileum:", ileum ,"\nNumber of samples in rectum:",rectum)
+
+#check whether they are in same order
+#colnames(htxCount) == htxMeta[,"External.ID"]
+#Write all the generated data into the related output files 
+write.table(htxCount, "output/htxCount.csv", sep=",",quote=FALSE, row.names = TRUE )
+write.table(htxMeta, "output/sampleLabels.csv", sep=",",quote=FALSE,row.names = FALSE, col.names = FALSE)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
